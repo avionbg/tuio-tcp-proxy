@@ -1,0 +1,18 @@
+This is simple implementation of tuio server/client on top of liblo
+I have written this to enable use of tuio protocol on flash based apps
+as flash doesn't support udp protocol this is only way aside xml-sockets
+which are on other hand much slower. For now only known app that does
+this kind of thing is flosc (which is not suited to this at least on my
+opinion as it's java based and It's implementing xml-sockets)
+This means that if you want to register events, you need to store a bunch
+of unnecessary data.
+
+Compiling:
+on linux based machines its enough to do make all
+
+Dependencies:
+Only the liblo package (with dev if your distro/system has that)
+
+Licensing:
+Im releasing this with GPL V2 or (at your option) any later version,
+full license is included in GPL2 file.
