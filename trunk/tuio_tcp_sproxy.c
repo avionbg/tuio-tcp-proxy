@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
         port = (char *) argv[2];
         fwdport = atoi ((char *) argv[4]);
     }
-    else if (argc = 1)
+    else if (argc == 1)
     {
         port = "3333";
         fwdport = 3000;
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
     {
         printf
         ("Usage: %s -p from_port -t to_tcp_port\n\nExample:\n %s -p 3333 -t 3000\n", (char *) argv[0], (char *) argv[0]);
-        return 1;
+        exit (1);
     }
     printf ("Starting server on port %s, forwarding to tcp port: %d\nPress CTRL+C to stop\n", port    , fwdport);
 
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
     closesocket(sd2);
     closesocket(sd);
     lo_server_thread_free(st);
-    return 0;
+    exit (0);
 }
 
 void error(int num, const char *msg, const char *path)
