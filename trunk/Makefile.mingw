@@ -1,12 +1,12 @@
 CC=i686-mingw32-gcc
-CFLAGS=-Wall -O3 -llo -lws2_32 -lpthread
-INCLUDES=-I/opt/cvs/crosscompile/local/include/
-LIBS=-L/opt/cvs/crosscompile/local/lib/
+CFLAGS=-Wall -O3 -llo -lpthreadGC2 -lws2_32 
+INCLUDES=-I/opt/local/include/
+LIBS=-L/opt/local/lib/ -L/usr/i686-mingw32/mingw/lib/
 STRIP=i686-mingw32-strip
 .PHONY: all
-all: tuio_tcp_proxy.exe tuio_dump.exe tuio_tcp_sproxy.exe tuio_sdump.exe
+all: tuio_tcp_proxy.exe tuio_dump.exe toxy.exe toxy_dump.exe
 
-tuio_tcp_sproxy.exe: tuio_tcp_sproxy.c
+toxy.exe: toxy.c
 	$(CC) $< -o $@ $(CFLAGS) $(LIBS) $(INCLUDES)
 	$(STRIP) $@
 
@@ -18,9 +18,9 @@ tuio_dump.exe: tuio_dump.c
 	$(CC) $< -o $@ $(CFLAGS) $(INCLUDES) $(LIBS)
 	$(STRIP) $@
 
-tuio_sdump.exe: tuio_sdump.c
+toxy_dump.exe: toxy_dump.c
 	$(CC) $< -o $@ $(CFLAGS) $(INCLUDES) $(LIBS)
 	$(STRIP) $@
 
 .PHONY clean:
-	rm -f tuio_dump.exe tuio_sdump.exe tuio_tcp_proxy.exe tuio_tcp_sproxy.exe 
+	rm -f tuio_dump.exe toxy_dump.exe toxy.exe tuio_tcp_proxy.exe 
