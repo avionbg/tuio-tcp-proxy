@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h> //*for TCP_NODELAY
 #include <netdb.h>
 #include <fcntl.h>
 #endif
@@ -150,10 +151,19 @@ int main(int argc, char *argv[])
         exit(1);
     }
     servsock = socket(PF_INET, SOCK_STREAM, ptrp->p_proto);
-    setsockopt(servsock,SOL_SOCKET,SO_REUSEADDR,(void *)&opt, sizeof(opt));
 #ifdef WIN32
+    setsockopt(servsock,SOL_SOCKET,SO_REUSEADDR,(void *)&opt, sizeof(opt));
     mingw_setnonblocking(servsock, 1);
 #elif linux
+int size = 1024;
+//int new_len;
+//int arglen = sizeof(new_len);
+if (-1 == setsockopt(servsock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)))
+perror("setsockopt");
+//if (-1 == getsockopt(servsock, SOL_SOCKET, SO_SNDBUF, &new_len, &arglen))
+//perror("getsockopt");
+//printf("size was %d, but set %d\n", size, new_len);
+    setsockopt(servsock,SOL_SOCKET,SO_REUSEADDR | TCP_NODELAY ,(void *)&opt, sizeof(opt));
     fcntl(servsock, F_SETFL, O_NONBLOCK);
     signal(SIGPIPE,SIG_IGN);
 #endif
@@ -209,6 +219,7 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
     if ( !strcmp((char *) argv[0],"set") )
     {
         set *msgset;
+        int status;
         msgset = calloc(1, sizeof(set));
         strcpy(msgset->path, path);
         strcpy (msgset->name, (char *) argv[0]);
@@ -223,16 +234,18 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             msgset->w = argv[7]->f;
             msgset->h = argv[8]->f;
         }
-        //printf("sizeof msgset: %d sizeof msgset->path: %d\n",sizeof(*msgset),sizeof(msgset->path));
         if (debug) printf ("path: %s name: %s ID: %d x: %f y: %f X: %f Y: %f m: %f\n",msgset->path, msgset->name, msgset->sessionID, msgset->x, msgset->y, msgset->X, msgset->Y, msgset->m);
         alen = sizeof(address);
         if ( clientsock > 0 || (clientsock=accept(servsock, (struct sockaddr *)&address, &alen)) > 0)
         {
-            if (send(clientsock,msgset,sizeof(*msgset),0) <0)
+            status = send(clientsock,msgset,sizeof(*msgset),0);
+            if (status < 0)
             {
             perror("set (send) failed");
-            closesocket(clientsock);
-            closesocket(servsock);
+            if (status == -EPIPE)
+                if (shutdown(clientsock,SHUT_RDWR) <0)
+                closesocket(servsock);
+                closesocket(clientsock);
             }
         }
         free (msgset);
@@ -261,7 +274,7 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
         }
         free(msgset);
     }
-    else if ( !strcmp((char *) argv[0],"alive") && argc >1 )
+    else if ( !strcmp((char *) argv[0],"alive") )
     {
         struct _alive {
         char path[12];
