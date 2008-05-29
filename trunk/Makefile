@@ -7,10 +7,10 @@ tuio_tcp_proxy: tuio_tcp_proxy.c
 toxy: toxy.c
 	gcc -llo $< -o $@
 
-tuio_dump: toxy_dump.c
+toxy_dump: toxy_dump.c
 	gcc -llo $< -o $@
 
-tuio_sdump: toxy_dump.c
+tuio_dump: tuio_dump.c
 	gcc -llo $< -o $@
 
 .PHONY clean:

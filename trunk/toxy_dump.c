@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     }
     while (1)
     {
-        char buffer[1024];
+        char buffer[256];
         int bytes = 1;
         while (bytes >0)
         {
@@ -161,14 +161,14 @@ int main(int argc, char *argv[])
                 int *blobs = (void *) &(msgset->data);
                 int sizeb = blobs[0];
                 int i;
-                printf("path: %s name: %s numids: %d ::: ",msgset->path, msgset->name, blobs[0]);
+                printf("path: %s name: %s numids: %d ::: ",msgset->path, msgset->name, blobs[0] -1);
                 for (i=1;i<sizeb;i++)
                 {
                 printf("%d=>%d ",i,blobs[i]);
                  }
                  printf("\n");
             }
-
+            //fflush ((void*) sd);
             fflush(stdout);
 
         }
