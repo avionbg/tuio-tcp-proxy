@@ -56,6 +56,7 @@ int servsock, clientsock, fwdport;
 int done = 0;
 int debug = 0;
 char *port;
+lo_server_thread st;
 
 typedef struct
 {
@@ -78,6 +79,8 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
 int quit_handler(const char *path, const char *types, lo_arg **argv, int argc,
                  void *data, void *user_data);
 void sigint_handler(int sig);
+void initlo();
+void initcp();
 
 #ifdef WIN32
 static void
@@ -108,6 +111,94 @@ int mingw_setnonblocking (SOCKET fd, int nonblocking)
 }
 #endif
 
+void initcp()
+{
+#ifdef WIN32
+    WSADATA wsaData;
+    WSAStartup(0x0101, &wsaData);
+#endif
+    char *opt;
+    memset((char *)&address,0,sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons((u_short)fwdport);
+
+    if ( ((int)(ptrp = getprotobyname("tcp"))) == 0)
+    {
+        fprintf(stderr, "cannot map \"tcp\" to protocol number");
+        exit(1);
+    }
+    servsock = socket(PF_INET, SOCK_STREAM, ptrp->p_proto);
+#ifdef WIN32
+    setsockopt(servsock,SOL_SOCKET,SO_REUSEADDR,(void *)&opt, sizeof(opt));
+    mingw_setnonblocking(servsock, 1);
+#elif linux
+    int size = 1024;
+    if (-1 == setsockopt(servsock, SOL_SOCKET, SO_REUSEADDR | TCP_NODELAY | SO_SNDBUF,
+        &size, sizeof(size)))
+        perror("setsockopt");
+    fcntl(servsock, F_SETFL, O_NONBLOCK);
+    signal(SIGPIPE,SIG_IGN);
+#endif
+    if (servsock < 0)
+    {
+        fprintf(stderr, "socket creation failed\n");
+        exit(1);
+    }
+    if (bind(servsock, (struct sockaddr *)&address, sizeof(address)) < 0)
+    {
+        fprintf(stderr,"bind failed\n");
+        exit(1);
+    }
+    if (listen(servsock, QLEN) < 0)
+    {
+        fprintf(stderr,"listen failed\n");
+        exit(1);
+    }
+
+}
+void stoptcp()
+{
+    int err;//,status;
+    if (servsock)
+    {
+    err = shutdown (servsock, SHUT_RDWR);
+    //printf("Error: %d",err);
+    fflush(stdout);
+    if (err <0) perror("Error shutting down serversock\n");
+    //closesocket(clientsock);
+    closesocket(servsock);
+    }
+/*    if (clientsock)
+    {
+    err = shutdown (clientsock, SHUT_RDWR);
+    if (err <0) perror("Error shutting down clientsock\n");
+    //closesocket(clientsock);
+    closesocket(clientsock);
+    }*/
+    if ( err == 0 )
+    {
+        printf ("restarting tcp\n");
+        fflush(stdout);
+        //lo_server_thread_free(st);
+#ifdef WIN32
+        Sleep(100);
+#elif linux
+        usleep(100000);
+#endif
+        initcp();
+        //initlo();
+    }
+}
+
+void initlo()
+{
+    st = lo_server_thread_new(port, error);
+    lo_server_thread_add_method(st, "/quit", "", quit_handler, NULL);
+    lo_server_thread_add_method(st, NULL, NULL, fwd_handler, NULL);
+    lo_server_thread_start(st);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc == 5 && argv[1][0] == '-' && argv[1][1] == 'p' &&
@@ -135,58 +226,8 @@ int main(int argc, char *argv[])
     }
     printf ("Starting server on port %s, forwarding to tcp port: %d\nPress CTRL+C to stop\n", port , fwdport);
 
-#ifdef WIN32
-    WSADATA wsaData;
-    WSAStartup(0x0101, &wsaData);
-#endif
-    char *opt;
-    memset((char *)&address,0,sizeof(address));
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons((u_short)fwdport);
-
-    if ( ((int)(ptrp = getprotobyname("tcp"))) == 0)
-    {
-        fprintf(stderr, "cannot map \"tcp\" to protocol number");
-        exit(1);
-    }
-    servsock = socket(PF_INET, SOCK_STREAM, ptrp->p_proto);
-#ifdef WIN32
-    setsockopt(servsock,SOL_SOCKET,SO_REUSEADDR,(void *)&opt, sizeof(opt));
-    mingw_setnonblocking(servsock, 1);
-#elif linux
-int size = 1024;
-//int new_len;
-//int arglen = sizeof(new_len);
-if (-1 == setsockopt(servsock, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)))
-perror("setsockopt");
-//if (-1 == getsockopt(servsock, SOL_SOCKET, SO_SNDBUF, &new_len, &arglen))
-//perror("getsockopt");
-//printf("size was %d, but set %d\n", size, new_len);
-    setsockopt(servsock,SOL_SOCKET,SO_REUSEADDR | TCP_NODELAY ,(void *)&opt, sizeof(opt));
-    fcntl(servsock, F_SETFL, O_NONBLOCK);
-    signal(SIGPIPE,SIG_IGN);
-#endif
-    if (servsock < 0)
-    {
-        fprintf(stderr, "socket creation failed\n");
-        exit(1);
-    }
-    if (bind(servsock, (struct sockaddr *)&address, sizeof(address)) < 0)
-    {
-        fprintf(stderr,"bind failed\n");
-        exit(1);
-    }
-    if (listen(servsock, QLEN) < 0)
-    {
-        fprintf(stderr,"listen failed\n");
-        exit(1);
-    }
-
-    lo_server_thread st = lo_server_thread_new(port, error);
-    lo_server_thread_add_method(st, "/quit", "", quit_handler, NULL);
-    lo_server_thread_add_method(st, NULL, NULL, fwd_handler, NULL);
-    lo_server_thread_start(st);
+    initcp();
+    initlo();
     if (signal(SIGINT, sigint_handler) == SIG_ERR)
     {
         perror("signal");
@@ -216,6 +257,11 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
                     int argc, void *data, void *user)
 {
     int alen,j;
+    alen = sizeof(address);
+
+    if ( !clientsock || clientsock < 0 )
+        clientsock=accept(servsock, (struct sockaddr *)&address, &alen);
+
     if ( !strcmp((char *) argv[0],"set") )
     {
         set *msgset;
@@ -235,19 +281,16 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             msgset->h = argv[8]->f;
         }
         if (debug) printf ("path: %s name: %s ID: %d x: %f y: %f X: %f Y: %f m: %f\n",msgset->path, msgset->name, msgset->sessionID, msgset->x, msgset->y, msgset->X, msgset->Y, msgset->m);
-        alen = sizeof(address);
-        if ( clientsock > 0 || (clientsock=accept(servsock, (struct sockaddr *)&address, &alen)) > 0)
-        {
-            status = send(clientsock,msgset,sizeof(*msgset),0);
+            status = send(clientsock,(void *) msgset,sizeof(*msgset),0);
             if (status < 0)
             {
             perror("set (send) failed");
-            if (status == -EPIPE)
-                if (shutdown(clientsock,SHUT_RDWR) <0)
-                closesocket(servsock);
-                closesocket(clientsock);
+            if (errno == EPIPE)
+                printf("EPIPE\n");
+                //if (shutdown(clientsock,SHUT_RDWR) <0)
+                //closesocket(servsock);
+                //closesocket(clientsock);
             }
-        }
         free (msgset);
     }
     else if ( !strcmp((char *) argv[0],"fseq") && argv[1]->i != -1 )
@@ -260,18 +303,16 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
         msgset->framenum = argv[1]->i;
         if (debug) printf("path: %s name: %s fremseq: %d\n",msgset->path, msgset->name, msgset->framenum);
         alen = sizeof(address);
-        if ( clientsock > 0 || (clientsock=accept(servsock, (struct sockaddr *)&address, &alen)) > 0)
-        {
-            status = send(clientsock,msgset,sizeof(*msgset),0);
+            status = send(clientsock,(void *) msgset,sizeof(*msgset),0);
             if (status < 0)
             {
             perror("fseq (send) failed");
-            if (status == -EPIPE)
-                if (shutdown(clientsock,SHUT_RDWR) <0)
-                closesocket(servsock);
-                closesocket(clientsock);
+            if (status == EPIPE)
+                printf("EPIPE\n");
+                //if (shutdown(clientsock,SHUT_RDWR) <0)
+                //closesocket(servsock);
+                //closesocket(clientsock);
             }
-        }
         free(msgset);
     }
     else if ( !strcmp((char *) argv[0],"alive") )
@@ -296,21 +337,21 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             if (debug) printf("Id[%d] - %d ",j-1,msgset->blobs[j]);
         }
         if (debug) printf("\n");
-        alen = sizeof(address);
-        if ( clientsock > 0 || (clientsock=accept(servsock, (struct sockaddr *)&address, &alen)) > 0)
-        {
-            status = send(clientsock,msgset,sizeof(*msgset),0);
+            status = send(clientsock,(void *) msgset,sizeof(*msgset),0);
             if (status < 0)
             {
             perror("alive (send) failed");
-            if (status = -EPIPE)
-                if (shutdown(clientsock,SHUT_RDWR) <0)
-                closesocket(servsock);
-                closesocket(clientsock);
+            if (errno == EPIPE)
+                printf("EPIPE\n");
+            printf("errno %d",errno);
+                //if (shutdown(clientsock,SHUT_RDWR) <0)
+                //closesocket(servsock);
+                //closesocket(clientsock);
+                //stoptcp();
             }
-        }
         free(msgset);
     }
+    fflush(stdout);
     return 0;
 }
 
