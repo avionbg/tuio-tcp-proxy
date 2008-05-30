@@ -128,48 +128,24 @@ package flash.events {
 			
 			var time = getTimer();
 			var update:Boolean;
-										
+			var aliveMessage:Boolean;
+			var aliveBlobs:ByteArray;
+			
 			while(byteArray.bytesAvailable>0){
 				if(byteArrayBeginsWithString(byteArray,"/tuio/2Dcur")){
+					
 					byteArray.position++;
 					
 					if(byteArrayBeginsWithString(byteArray,"alive")){
-						update = true;
-						
-						if(DEBUG){
-							DEBUGGER.clearDebugText();
-						}
-						
+						aliveMessage = true;
+
 						byteArray.position+=3;
-						
 						var numBlobs = byteArray.readInt();
-												
-						for each (var obj1:TUIOObject in OBJECT_ARRAY){
-							obj1.TUIO_ALIVE = false;
-						}
 						
-						var curID:int;
+						aliveBlobs = null;
+						aliveBlobs = new ByteArray();
 						
-						for(var h=0;h<numBlobs-1;h++){
-							curID = byteArray.readInt();
-							if(DEBUG){
-								DEBUGGER.addDebugText("Blob id: "+curID+"\n");
-							}
-							if(getObjectById(curID)){
-								getObjectById(curID).TUIO_ALIVE = true;
-							}
-						}
-						
-						
-						for (var i:int=0; i<OBJECT_ARRAY.length; i++ ){	
-							if(OBJECT_ARRAY[i].TUIO_ALIVE == false){
-								OBJECT_ARRAY[i].notifyRemoved();
-								STAGE.removeChild(OBJECT_ARRAY[i].TUIO_CURSOR);
-								OBJECT_ARRAY.splice(i, 1);
-								i--;
-							}
-						}
-						
+						if(numBlobs>1) byteArray.readBytes(aliveBlobs,0,(numBlobs-1)*4);
 					}else if(byteArrayBeginsWithString(byteArray,"set")){					
 						
 						byteArray.position+=5;				
@@ -195,19 +171,17 @@ package flash.events {
 																								
 							var tuioobj:TUIOObject = getObjectById(id);
 							if(tuioobj == null){
-								if(id==0) trace("zero blob")
 								tuioobj = new TUIOObject("2Dcur", id, x, y, X, Y, -1, 0, wd, ht, dobj);
 								STAGE.addChild(tuioobj.TUIO_CURSOR);								
 								OBJECT_ARRAY.push(tuioobj);
 								tuioobj.notifyCreated();
-							}else {
+							}else{
 								tuioobj.TUIO_CURSOR.x = x;
 								tuioobj.TUIO_CURSOR.y = y;
 								tuioobj.oldX = tuioobj.x;
 								tuioobj.oldY = tuioobj.y;
 								tuioobj.x = x;
 								tuioobj.y = y;
-								
 								tuioobj.width = wd;
 								tuioobj.height = ht;
 								tuioobj.area = wd * ht;								
@@ -253,12 +227,52 @@ package flash.events {
 					if(byteArray.bytesAvailable>0) byteArray.position++; //only change if nothing found
 				}
 			}
+			
+			if(aliveMessage){
+				update = true;
+				
+				if(DEBUG){
+					DEBUGGER.clearDebugText();
+				}
+				
+				for each (var obj1:TUIOObject in OBJECT_ARRAY){
+					obj1.TUIO_ALIVE = false;
+				}
+				
+				var curID:int;
+				
+				aliveBlobs.endian = Endian.LITTLE_ENDIAN;
+				
+				while(aliveBlobs.bytesAvailable>0){
+					curID = aliveBlobs.readInt();
+					if(DEBUG){
+						DEBUGGER.addDebugText("Blob id: "+curID+"\n");
+					}
+					if(getObjectById(curID)){
+						getObjectById(curID).TUIO_ALIVE = true;
+					}
+				}
+				
+				
+				for (var i:int=0; i<OBJECT_ARRAY.length; i++ ){	
+					if(OBJECT_ARRAY[i].TUIO_ALIVE == false){
+						OBJECT_ARRAY[i].notifyRemoved();
+						STAGE.removeChild(OBJECT_ARRAY[i].TUIO_CURSOR);
+						OBJECT_ARRAY.splice(i, 1);
+						i--;
+					}
+				}
+				
+				aliveMessage = false;
+			}
 
 			var finalTime = getTimer();
 			if(DEBUG && update){
 				DEBUGGER.addDebugText("\nTime test - " + (finalTime - time) + " ms");
 				update = false;
 			}
+			
+			byteArray = null;
 		}
 //---------------------------------------------------------------------------------------------------------------------------------------------
         private static function activateDebugMode():void{
@@ -286,11 +300,12 @@ package flash.events {
 		}
 //---------------------------------------------------------------------------------------------------------------------------------------------
         private static function dataHandler(e:ProgressEvent):void{    
-			var dump = new ByteArray();
+			var dump:ByteArray = new ByteArray();
 			SOCKET.readBytes(dump);
-			SOCKET.flush();
 			
 			processMessage(dump);
+			
+			dump = null;
         } 
 //---------------------------------------------------------------------------------------------------------------------------------------------   			
 		private static function closeHandler(event:Event):void{
