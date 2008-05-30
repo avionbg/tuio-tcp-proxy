@@ -130,6 +130,7 @@ package flash.events {
 			var update:Boolean;
 			var aliveMessage:Boolean;
 			var aliveBlobs:ByteArray;
+			var setBlobs:Array = new Array();
 			
 			while(byteArray.bytesAvailable>0){
 				if(byteArrayBeginsWithString(byteArray,"/tuio/2Dcur")){
@@ -150,59 +151,75 @@ package flash.events {
 						
 						byteArray.position+=5;				
 															
-						if(byteArray.bytesAvailable>=(7*4)){
+						if(byteArray.bytesAvailable>=32){
 							var id:int = byteArray.readInt();
-							var x:Number = byteArray.readFloat()* STAGE.stageWidth;
-							var y:Number = byteArray.readFloat()* STAGE.stageHeight;
-							var X:Number = byteArray.readFloat();
-							var Y:Number = byteArray.readFloat();
-							var m:Number = byteArray.readFloat();
-							var wd:Number = byteArray.readFloat();
-							var ht:Number = byteArray.readFloat();;
 							
-							var stagePoint:Point = new Point(x,y);					
-							var displayObjArray:Array = STAGE.getObjectsUnderPoint(stagePoint);
-										
-							var dobj:DisplayObject = null;
-											
-							if(displayObjArray.length > 0){
-								dobj = displayObjArray[displayObjArray.length-1];	
-							}
-																								
-							var tuioobj:TUIOObject = getObjectById(id);
-							if(tuioobj == null){
-								tuioobj = new TUIOObject("2Dcur", id, x, y, X, Y, -1, 0, wd, ht, dobj);
-								STAGE.addChild(tuioobj.TUIO_CURSOR);								
-								OBJECT_ARRAY.push(tuioobj);
-								tuioobj.notifyCreated();
-							}else{
-								tuioobj.TUIO_CURSOR.x = x;
-								tuioobj.TUIO_CURSOR.y = y;
-								tuioobj.oldX = tuioobj.x;
-								tuioobj.oldY = tuioobj.y;
-								tuioobj.x = x;
-								tuioobj.y = y;
-								tuioobj.width = wd;
-								tuioobj.height = ht;
-								tuioobj.area = wd * ht;								
-								tuioobj.dX = X;
-								tuioobj.dY = Y;
-								tuioobj.setObjOver(dobj);
-								
-								var d:Date = new Date();																
-								if(!( int(Y*1000) == 0 && int(Y*1000) == 0)){
-									tuioobj.notifyMoved();
+							var setBlobFound:Boolean;
+							for each(var setBlob:Number in setBlobs){
+								if(setBlob == id){
+									setBlobFound = true;
+									break;
 								}
+							}
+						
+							if(setBlobFound==true){
+								byteArray.position+=28;
+							}else{
+								setBlobs.push(id);
 								
-								if( int(Y*250) == 0 && int(Y*250) == 0) {
-									var lastModDur:Number = d.time - tuioobj.lastModifiedTime;
-									if(Math.abs(lastModDur) > HOLD_THRESHOLD){
-										for(var ndx:int=0; ndx<EVENT_ARRAY.length; ndx++){
-											EVENT_ARRAY[ndx].dispatchEvent(tuioobj.getTouchEvent(TouchEvent.LONG_PRESS));
-										}
-										tuioobj.lastModifiedTime = d.time;																		
+								var x:Number = byteArray.readFloat()* STAGE.stageWidth;
+								var y:Number = byteArray.readFloat()* STAGE.stageHeight;
+								var X:Number = byteArray.readFloat();
+								var Y:Number = byteArray.readFloat();
+								var m:Number = byteArray.readFloat();
+								var wd:Number = byteArray.readFloat();
+								var ht:Number = byteArray.readFloat();
+								
+								//trace("[SET]",id,x,y,X,Y,m,wd,ht);
+								
+								var stagePoint:Point = new Point(x,y);					
+								var displayObjArray:Array = STAGE.getObjectsUnderPoint(stagePoint);
+											
+								var dobj:DisplayObject = null;
+												
+								if(displayObjArray.length > 0){
+									dobj = displayObjArray[displayObjArray.length-1];	
+								}
+																									
+								var tuioobj:TUIOObject = getObjectById(id);
+								if(tuioobj == null){
+									tuioobj = new TUIOObject("2Dcur", id, x, y, X, Y, -1, 0, wd, ht, dobj);
+									STAGE.addChild(tuioobj.TUIO_CURSOR);								
+									OBJECT_ARRAY.push(tuioobj);
+									tuioobj.notifyCreated();
+								}else{
+									tuioobj.TUIO_CURSOR.x = x;
+									tuioobj.TUIO_CURSOR.y = y;
+									tuioobj.oldX = tuioobj.x;
+									tuioobj.oldY = tuioobj.y;
+									tuioobj.x = x;
+									tuioobj.y = y;
+									tuioobj.width = wd;
+									tuioobj.height = ht;
+									tuioobj.area = wd * ht;								
+									tuioobj.dX = X;
+									tuioobj.dY = Y;
+									tuioobj.setObjOver(dobj);
+									
+									var d:Date = new Date();																
+									if(!( int(Y*1000) == 0 && int(Y*1000) == 0)){
+										tuioobj.notifyMoved();
 									}
 									
+									if( int(Y*250) == 0 && int(Y*250) == 0) {
+										var lastModDur:Number = d.time - tuioobj.lastModifiedTime;
+										if(Math.abs(lastModDur) > HOLD_THRESHOLD){
+											for(var ndx:int=0; ndx<EVENT_ARRAY.length; ndx++){
+												EVENT_ARRAY[ndx].dispatchEvent(tuioobj.getTouchEvent(TouchEvent.LONG_PRESS));
+											}
+											tuioobj.lastModifiedTime = d.time;																		
+										}
+									}
 								}
 							}
 						}
@@ -214,8 +231,6 @@ package flash.events {
 						} catch (e:Error){
 							trace("(" + e + ") Dispatch event failed " + tuioobj.ID);
 						}
-
-						//trace("[SET]",id,x,y,X,Y,m,wd,ht);
 					}else if(byteArrayBeginsWithString(byteArray,"fseq")){
 						
 						byteArray.position+=4;
@@ -224,7 +239,7 @@ package flash.events {
 						//trace("[FSEQ]",FRAME_COUNT);
 					}
 				}else{
-					if(byteArray.bytesAvailable>0) byteArray.position++; //only change if nothing found
+					if(byteArray.bytesAvailable>0) byteArray.position++;
 				}
 			}
 			
@@ -246,7 +261,8 @@ package flash.events {
 				while(aliveBlobs.bytesAvailable>0){
 					curID = aliveBlobs.readInt();
 					if(DEBUG){
-						DEBUGGER.addDebugText("Blob id: "+curID+"\n");
+						var activeBlobInfo:TUIOObject = getObjectById(curID);
+						if(activeBlobInfo!=null) DEBUGGER.addDebugText("blob "+curID+" ("+int(activeBlobInfo.x)+", "+int(activeBlobInfo.y)+")\n");
 					}
 					if(getObjectById(curID)){
 						getObjectById(curID).TUIO_ALIVE = true;
