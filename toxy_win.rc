@@ -1,0 +1,34 @@
+100 ICON "toxy.ico"
+101 ICON "network-error.ico"
+102 ICON "network-offline.ico"
+103 ICON "network-idle.ico"
+1 VERSIONINFO
+FILEVERSION 1, 0, 1, 0
+PRODUCTVERSION 1, 0, 0, 0
+{
+ BLOCK "StringFileInfo"
+  {
+  BLOCK "040904E4"
+   {
+VALUE "CompanyName", "Microlink doo"
+
+VALUE "FileDescription", "Tuio sOcket proXY"
+
+VALUE "FileVersion", "1.0"
+
+VALUE "InternalName", "toxy"
+
+VALUE "LegalCopyright", "GNU Public License v.2"
+
+VALUE "OriginalFilename", "toxy.c"
+
+VALUE "ProductName", "toxy"
+
+VALUE "ProductVersion", "1.0"
+   }
+  }
+ BLOCK "VarFileInfo"
+ {
+  VALUE "Translation", 1033, 1252
+ }
+}
