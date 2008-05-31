@@ -1,7 +1,7 @@
 CC=i686-mingw32-gcc
-CFLAGS=-Wall -O3 -llo -lpthreadGC2 -lws2_32 
-INCLUDES=-I/opt/local/include/
-LIBS=-L/opt/local/lib/ -L/usr/i686-mingw32/mingw/lib/
+CFLAGS=-Wall -O3 -llo -lpthread -lws2_32 -static 
+INCLUDES=-I/opt/local/static/include/
+LIBS=-L/opt/local/static/lib/ -L/usr/i686-mingw32/mingw/lib/
 STRIP=i686-mingw32-strip
 .PHONY: all
 all: tuio_tcp_proxy.exe tuio_dump.exe toxy.exe toxy_dump.exe
