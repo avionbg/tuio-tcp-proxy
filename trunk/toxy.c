@@ -49,14 +49,15 @@
 
 #include "lo/lo.h"
 
-#define	QLEN 1
+#define	QLEN 5
 struct protoent *ptrp;
 struct sockaddr_in address;
 int servsock, clientsock, fwdport;
 int done = 0;
 int debug = 0;
+int toggle = 1;
 char *port;
-lo_server_thread st;
+lo_server st;
 
 typedef struct
 {
@@ -74,10 +75,10 @@ typedef struct
 } fseq;
 
 void error(int num, const char *m, const char *path);
-int fwd_handler(const char *path, const char *types, lo_arg **argv,
-                    int argc, void *data, void *user_data);
 int quit_handler(const char *path, const char *types, lo_arg **argv, int argc,
                  void *data, void *user_data);
+int fwd_handler(const char *path, const char *types, lo_arg **argv,
+                    int argc, void *data, void *user_data);
 void sigint_handler(int sig);
 void initlo();
 void initcp();
@@ -193,10 +194,10 @@ void stoptcp()
 
 void initlo()
 {
-    st = lo_server_thread_new(port, error);
-    lo_server_thread_add_method(st, "/quit", "", quit_handler, NULL);
-    lo_server_thread_add_method(st, NULL, NULL, fwd_handler, NULL);
-    lo_server_thread_start(st);
+    st = lo_server_new(port, error);
+    lo_server_add_method(st, "/quit", "", quit_handler, NULL);
+    lo_server_add_method(st, NULL, NULL, fwd_handler, NULL);
+    //lo_server_thread_start(st);
 }
 
 int main(int argc, char *argv[])
@@ -225,28 +226,56 @@ int main(int argc, char *argv[])
         exit (1);
     }
     printf ("Starting server on port %s, forwarding to tcp port: %d\nPress CTRL+C to stop\n", port , fwdport);
-
+    int lo_fd;
+    int retval;
+    fd_set rfds;
     initcp();
     initlo();
+    lo_fd = lo_server_get_socket_fd(st);
+
     if (signal(SIGINT, sigint_handler) == SIG_ERR)
     {
         perror("signal");
         exit(1);
     }
-    while (!done)
+    if (lo_fd > 0) {
+
+    do
     {
-#ifdef WIN32
-        Sleep(1);
-#elif linux
-        usleep(1000);
-#endif
-    }
+            FD_ZERO(&rfds);
+//#ifndef WIN32
+            //FD_SET(0, &rfds);  /* stdin */
+//#endif
+            FD_SET(lo_fd, &rfds);
+printf("select()\n");
+            retval = select(lo_fd + 1, &rfds, NULL, NULL, NULL); /* no timeout */
+
+            if (retval == -1) {
+
+                printf("select() error\n");
+                exit(1);
+
+            } else if (retval > 0) {
+
+                //if (FD_ISSET(0, &rfds)) {
+
+                    //read_stdin();
+                    printf ("stdin\n");
+
+                //}
+                if (FD_ISSET(lo_fd, &rfds)) {
+
+                    lo_server_recv_noblock(st, 0);
+
+                }
+            }
+    }while (!done);
+}
     closesocket(clientsock);
     closesocket(servsock);
-    lo_server_thread_free(st);
+    //lo_server_thread_free(st);
     exit (0);
 }
-
 void error(int num, const char *msg, const char *path)
 {
     printf("liblo server error %d in path %s: %s\n", num, path, msg);
@@ -260,8 +289,13 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
     alen = sizeof(address);
 
     if ( !clientsock || clientsock < 0 )
+        {
         clientsock=accept(servsock, (struct sockaddr *)&address, &alen);
-
+        /*if (clientsock <0)
+            if (errno == EAGAIN)
+                printf("EAGAIN\n");*/
+        //perror("error pipe?? \n");//EAGAIN
+        }
     if ( !strcmp((char *) argv[0],"set") )
     {
         set *msgset;
@@ -284,12 +318,14 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             status = send(clientsock,(void *) msgset,sizeof(*msgset),0);
             if (status < 0)
             {
-            perror("set (send) failed");
+ /*           perror("set (send) failed");
             if (errno == EPIPE)
-                printf("EPIPE\n");
+                printf("EPIPE\n");*/
                 //if (shutdown(clientsock,SHUT_RDWR) <0)
                 //closesocket(servsock);
                 //closesocket(clientsock);
+            closesocket(clientsock);
+            clientsock = 0;
             }
         free (msgset);
     }
@@ -306,12 +342,14 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             status = send(clientsock,(void *) msgset,sizeof(*msgset),0);
             if (status < 0)
             {
-            perror("fseq (send) failed");
-            if (status == EPIPE)
+            /*if (status == EPIPE)
                 printf("EPIPE\n");
+            perror("fseq (send) failed");*/
                 //if (shutdown(clientsock,SHUT_RDWR) <0)
                 //closesocket(servsock);
                 //closesocket(clientsock);
+            closesocket(clientsock);
+            clientsock = 0;
             }
         free(msgset);
     }
@@ -340,13 +378,16 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             status = send(clientsock,(void *) msgset,sizeof(*msgset),0);
             if (status < 0)
             {
-            perror("alive (send) failed");
-            if (errno == EPIPE)
-                printf("EPIPE\n");
-            printf("errno %d",errno);
+            /*if (errno == EPIPE)
+                printf("EPIPE\n");*/
+            //if (errno == ECONNRESET)
+                //printf("ECONNRESET\n");
+            //printf("errno %d\n",errno);
                 //if (shutdown(clientsock,SHUT_RDWR) <0)
                 //closesocket(servsock);
-                //closesocket(clientsock);
+            closesocket(clientsock);
+            clientsock = 0;
+            /*perror("alive (send) failed");*/
                 //stoptcp();
             }
         free(msgset);
@@ -358,14 +399,19 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
 int quit_handler(const char *path, const char *types, lo_arg **argv, int argc,
                  void *data, void *user_data)
 {
+    if ( !strcmp((char *) path ,"/quit"))
+    {
     done = 1;
+    //if (debug)
     printf("Quiting\n\n");
     fflush(stdout);
     return 0;
+    }
+    else return toggle;
 }
 
 void sigint_handler(int sig)
 {
-    printf("Quiting!\n");
-    done = 1;
+    printf("Quiting! %d\n",done);
+    //done = 1;
 }
