@@ -5,6 +5,8 @@
 	import flash.text.TextField;
 	import flash.text.TextFormat;
 	import flash.geom.Matrix;
+	import flash.events.TouchEvent;
+	import flash.events.MouseEvent;
 	
 	public class TUIODebugger extends Sprite{
 		private const WIDTH:Number = 150;
@@ -14,15 +16,16 @@
 		private var _title:TextField;
 		private var _statusDisplay:Sprite;
 		private var _debugText:TextField;
-		private var _debugTextBg:Sprite;;
+		private var _debugTextBg:Sprite;
+		private var _on:Boolean;
+		private var _cachedDubugText:String;
+		private var _cachedFooterText:String;
 		
 		public function TUIODebugger(titleStr:String = "touchlib: debug"):void{
-			var bMatrix:Matrix = new Matrix();
-			bMatrix.createGradientBox(WIDTH,HEIGHT,90*Math.PI/180)
 			_button = new Sprite();
-			_button.graphics.beginGradientFill("linear",[0x2c3239,0x151618],[1,1],[0,255],bMatrix);
-			_button.graphics.lineStyle(1,0x455567,.75);
-			_button.graphics.drawRoundRect(0,0,WIDTH,HEIGHT,15);
+			_button.graphics.beginFill(0x111111);
+			_button.graphics.lineStyle(2,0x666666,.5,true);
+			_button.graphics.drawRoundRect(0,0,WIDTH,HEIGHT,20);
 			_button.graphics.endFill();
 			
 			var format:TextFormat = new TextFormat("Arial", 13, 0xFFFFFF,true);
@@ -40,18 +43,13 @@
 			_debugText.selectable = false;
 			_debugText.autoSize = "left";
 			_debugText.multiline = true;
-			//_debugText.text="Blob ID: 1249";
 			_debugText.width = WIDTH-(PADDING*2);
 						
 			_debugTextBg = new Sprite();
-						
-			/*_switchBgOn = new Sprite();
-			_switchBgOn.graphics.beginFill(0x97f324);
-			_switchBgOn.graphics.drawRoundRect(0,0,40,HEIGHT*.4,6);
-			*/
 			
 			_statusDisplay = new Sprite();
-			_statusDisplay.graphics.beginFill(0x97f324);
+			_statusDisplay.graphics.lineStyle(1,0x455567,.75);
+			_statusDisplay.graphics.beginFill(0x97f324,1);
 			_statusDisplay.graphics.drawCircle(0,0,HEIGHT*.15);
 			_statusDisplay.graphics.endFill();
 			
@@ -64,14 +62,10 @@
 			addChild(_debugTextBg);
 			addChild(_debugText);
 			addChild(_button);
-			//addChild(_switchBgOn);
 			addChild(_title);
 			addChild(sdb);
 			addChild(_statusDisplay);
-			
-			//_switchBgOn.y = (_button.height/2)-(_switchBgOn.height/2);
-			//_switchBgOn.x = WIDTH-PADDING-_switchBgOn.width;
-			
+
 			_title.y = (_button.height/2)-(_title.height/2);
 			_title.x = PADDING;
 			_debugText.y = HEIGHT+PADDING;
@@ -80,38 +74,96 @@
 			_statusDisplay.x = WIDTH-PADDING-(_statusDisplay.width/2);
 			sdb.x=_statusDisplay.x;
 			sdb.y=_statusDisplay.y;
-			off();
+			
+			_button.addEventListener(MouseEvent.CLICK, toggleDebug);
+			_button.addEventListener(TouchEvent.CLICK, toggleDebug);
+			_title.addEventListener(MouseEvent.CLICK, toggleDebug);
+			_title.addEventListener(TouchEvent.CLICK, toggleDebug);
+			_statusDisplay.addEventListener(MouseEvent.CLICK, toggleDebug);
+			_statusDisplay.addEventListener(TouchEvent.CLICK, toggleDebug);
+			sdb.addEventListener(MouseEvent.CLICK, toggleDebug);
+			sdb.addEventListener(TouchEvent.CLICK, toggleDebug);
+			
+			_cachedDubugText="";
+			_cachedFooterText="";
+			
+			debugOff();
 			resizeDebugTextBg();
 		}
 		
-		public function off():void{
-			_debugText.visible = false;
-			_statusDisplay.visible = false;
-			_debugTextBg.visible = false;
+		private function toggleDebug(evnt:*=null):void{
+			on = !on;
 		}
 		
-		public function on():void{
+		private function debugOff():void{
+			_debugText.visible = false;
+			_statusDisplay.visible = false;
+			//_debugTextBg.visible = false;
+			_debugText.text="";
+			resizeDebugTextBg();
+			_on = false;
+		}
+		
+		private function debugOn():void{
 			_debugText.visible = true;
 			_statusDisplay.visible = true;
-			_debugTextBg.visible = true;
+			//_debugTextBg.visible = true;
+			_on = true;
 		}
 		
 		public function clearDebugText():void{
-			_debugText.text="";
-			resizeDebugTextBg();
+			_cachedDubugText="";
+			constructText();
 		}
 		
 		public function addDebugText(s:String):void{
-			_debugText.appendText(s);
+			_cachedDubugText+=s;
+			constructText();
+		}
+		
+		
+		public function clearFooterText():void{
+			_cachedFooterText="";
+			constructText();
+		}
+		
+		public function addFooterText(s:String):void{
+			_cachedFooterText+=s;
+			constructText();
+		}
+		
+		private function constructText():void{
+			var concat:String = _cachedDubugText+(_cachedDubugText.length != 0 ? "\n\n" : "")+(_cachedFooterText.length == 0 ? "" : _cachedFooterText);
+			
+			if(concat == _debugText.text) return;
+			
+			_debugText.text = concat;
+			
 			resizeDebugTextBg();
 		}
 		
 		private function resizeDebugTextBg():void{
 			_debugTextBg.graphics.clear();
-			if(_debugText.text.length==0) return;
-			_debugTextBg.graphics.beginFill(0x2c3239,.7);
-			_debugTextBg.graphics.drawRoundRect(0,0,WIDTH,HEIGHT+(PADDING*2)+_debugText.height,15);
+			_debugTextBg.graphics.beginFill(0x000000,.3);
+			_debugTextBg.graphics.lineStyle(2,0xFFFFFF,.1);
+			if(_debugText.text.length==0){
+				_debugTextBg.graphics.drawRoundRect(0,0,WIDTH,HEIGHT,20);
+			}else{
+				_debugTextBg.graphics.drawRoundRect(0,0,WIDTH,HEIGHT+(PADDING*2)+_debugText.height,20);
+			}
 			_debugTextBg.graphics.endFill();
+		}
+		
+		public function get on():Boolean{
+			return _on;
+		}
+
+		public function set on(b:Boolean):void{
+			if(b==true){
+				debugOn();
+			}else{
+				debugOff();
+			}
 		}
 	}
 }
