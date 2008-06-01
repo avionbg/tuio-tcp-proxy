@@ -54,8 +54,8 @@ struct protoent *ptrp;
 struct sockaddr_in address;
 int servsock, clientsock, fwdport;
 int done = 0;
-int debug = 0;
 int toggle = 1;
+int debug = 0;
 char *port;
 lo_server st;
 
@@ -195,7 +195,7 @@ void stoptcp()
 void initlo()
 {
     st = lo_server_new(port, error);
-    lo_server_add_method(st, "/quit", "", quit_handler, NULL);
+    lo_server_add_method(st, NULL, NULL, quit_handler, NULL);
     lo_server_add_method(st, NULL, NULL, fwd_handler, NULL);
     //lo_server_thread_start(st);
 }
@@ -247,8 +247,9 @@ int main(int argc, char *argv[])
             //FD_SET(0, &rfds);  /* stdin */
 //#endif
             FD_SET(lo_fd, &rfds);
-printf("select()\n");
+//printf("select()\n");
             retval = select(lo_fd + 1, &rfds, NULL, NULL, NULL); /* no timeout */
+//                    printf ("stdin\n");
 
             if (retval == -1) {
 
@@ -328,6 +329,7 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             clientsock = 0;
             }
         free (msgset);
+    fflush(stdout);
     }
     else if ( !strcmp((char *) argv[0],"fseq") && argv[1]->i != -1 )
     {
@@ -352,6 +354,7 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
             clientsock = 0;
             }
         free(msgset);
+    fflush(stdout);
     }
     else if ( !strcmp((char *) argv[0],"alive") )
     {
@@ -391,12 +394,12 @@ int fwd_handler(const char *path, const char *types, lo_arg **argv,
                 //stoptcp();
             }
         free(msgset);
-    }
     fflush(stdout);
+    }
     return 0;
 }
 
-int quit_handler(const char *path, const char *types, lo_arg **argv, int argc,
+int qquit_handler(const char *path, const char *types, lo_arg **argv, int argc,
                  void *data, void *user_data)
 {
     if ( !strcmp((char *) path ,"/quit"))
@@ -414,4 +417,34 @@ void sigint_handler(int sig)
 {
     printf("Quiting! %d\n",done);
     //done = 1;
+}
+
+int quit_handler(const char *path, const char *types, lo_arg **argv, int argc,
+                 void *data, void *user_data)
+{
+    if ( !strcmp((char *) path ,"/quit"))
+    {
+    done = 1;
+    return 0;
+    }
+    //else if ( !strcmp((char *) path ,"/toggle"))
+    //{
+            //toggle = !toggle;
+        //if (connected < 0)
+        //{
+        //if (!toggle) ModifyTrayIcon( hWndtray, ID_TRAYICON, ID_TRAYICON, "Tuio processing stopped.." );
+        //else ModifyTrayIcon( hWndtray, ID_TRAYICON, ID_TRAYICON, "Tuio processing enabled.." );
+        //return 0;
+        //}
+        //else if (connected && toggle)
+            //ModifyTrayIcon( hWndtray, ID_TRAYICON, ID_TRAYICONB, "Tuio processing enabled.." );
+        //else if (!connected && toggle ) ModifyTrayIcon( hWndtray, ID_TRAYICON, ID_TRAYICONR, "Tuio processing stopped.." );
+        //else ModifyTrayIcon( hWndtray, ID_TRAYICON, ID_TRAYICON, "Tuio processing stoped.." );
+    //}
+    else if (!strcmp((char *) path ,"/tuio/2Dobj") || !strcmp((char *) path ,"/tuio/2Dcur"))
+    {
+        return toggle;
+    }
+    else
+    return 0;
 }
