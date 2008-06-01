@@ -20,7 +20,7 @@ package flash.events {
 	import flash.utils.getTimer;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
-
+	
 	public class TUIO{	
 		//private static var INSTANCE:TUIO;			
 		private static var STAGE:Stage;
@@ -28,7 +28,7 @@ package flash.events {
 		private static var SOCKET_STATUS:Boolean;	
 		private static var HOST:String;			
 		private static var PORT:Number;				
-		private static var FRAME_COUNT:Number;
+		private static var FRAME_COUNT:int;
 		//-------------------------------------- DEBUG VARS			
 		internal static var DEBUG:Boolean;
 		private static var DEBUGGER:TUIODebugger;
@@ -40,13 +40,13 @@ package flash.events {
 		//--------------------------------------
 		private static var SWIPE_THRESHOLD:Number = 1000;
 		private static var HOLD_THRESHOLD:Number = 4000;
-		
+			
 //---------------------------------------------------------------------------------------------------------------------------------------------	
 // CONSTRUCTOR - SINGLETON
 //---------------------------------------------------------------------------------------------------------------------------------------------		
-		public static function init ($STAGE:DisplayObjectContainer, $HOST:String, $PORT:Number, $DEBUG:Boolean = true):void{
+		public static function init ($STAGE:DisplayObjectContainer, $HOST:String, $PORT:Number, $PLAYBACK_URL:String, $DEBUG:Boolean = true):void{ //playback taken out of class but but param kept for backward compatability
 			if (INITIALIZED) { trace("TUIO Already Initialized!"); return; }
-			
+					
 			// FIXME: VERIFY STAGE IS AVAILABLE
 			STAGE = $STAGE.stage;
 			STAGE.align = "TL";
@@ -78,21 +78,21 @@ package flash.events {
 		}
 */
 //---------------------------------------------------------------------------------------------------------------------------------------------
-		public static function addObjectListener(id:Number, receiver:Object):void{
+		public static function addObjectListener(id:int, receiver:Object):void{
 			var tmpObj:TUIOObject = getObjectById(id);			
 			if(tmpObj){
 				tmpObj.addListener(receiver);				
 			}
 		}
 //---------------------------------------------------------------------------------------------------------------------------------------------
-		public static function removeObjectListener(id:Number, receiver:Object):void{
+		public static function removeObjectListener(id:int, receiver:Object):void{
 			var tmpObj:TUIOObject = getObjectById(id);			
 			if(tmpObj){
 				tmpObj.removeListener(receiver);				
 			}
 		}		
 //---------------------------------------------------------------------------------------------------------------------------------------------
-		public static function getObjectById(id:Number):TUIOObject{
+		public static function getObjectById(id:int):TUIOObject{
 			if(id == 0){
 				return new TUIOObject("mouse", 0, STAGE.mouseX, STAGE.mouseY, 0, 0, 0, 0, 10, 10, null);
 			}
@@ -126,101 +126,77 @@ package flash.events {
 		private static function processMessage(byteArray:ByteArray):void{
 			byteArray.endian = Endian.LITTLE_ENDIAN;
 			
-			var time = getTimer();
-			var update:Boolean;
-			var aliveMessage:Boolean;
-			var aliveBlobs:ByteArray;
-			var setBlobs:Array = new Array();
-			
-			while(byteArray.bytesAvailable>0){
-				if(byteArrayBeginsWithString(byteArray,"/tuio/2Dcur")){
-					
-					byteArray.position++;
-					
-					if(byteArrayBeginsWithString(byteArray,"alive")){
-						aliveMessage = true;
+			var aliveMessage:Boolean,
+			    aliveBlobs:ByteArray;
+						
+			while(byteArray.bytesAvailable>=20){ // reading 12 for the path and 8 for the type (12 bytes + 8 bytes = 20 bytes)
+				var path:String = byteArray.readUTFBytes(12),
+				    type:String = byteArray.readUTFBytes(8);
 
-						byteArray.position+=3;
-						var numBlobs = byteArray.readInt();
+				if(path === "/tuio/2Dcur"){
+					if(type === "alive"){
+						aliveMessage = true; //is this neccessary? should I just process every alive event instead of one per package?
+
+						var numBlobs:int = byteArray.readInt(),
+						    setMsgByteLen:int = (numBlobs-1) << 2;
 						
 						aliveBlobs = null;
 						aliveBlobs = new ByteArray();
 						
-						if(numBlobs>1) byteArray.readBytes(aliveBlobs,0,(numBlobs-1)*4);
-					}else if(byteArrayBeginsWithString(byteArray,"set")){					
-						
-						byteArray.position+=5;				
-															
-						if(byteArray.bytesAvailable>=32){
-							var id:int = byteArray.readInt();
-							
-							var setBlobFound:Boolean;
-							for each(var setBlob:Number in setBlobs){
-								if(setBlob == id){
-									setBlobFound = true;
-									break;
-								}
-							}
-						
-							if(setBlobFound==true){
-								byteArray.position+=28;
-							}else{
-								setBlobs.push(id);
-								
-								var x:Number = byteArray.readFloat()* STAGE.stageWidth;
-								var y:Number = byteArray.readFloat()* STAGE.stageHeight;
-								var X:Number = byteArray.readFloat();
-								var Y:Number = byteArray.readFloat();
-								var m:Number = byteArray.readFloat();
-								var wd:Number = byteArray.readFloat();
-								var ht:Number = byteArray.readFloat();
-								
-								//trace("[SET]",id,x,y,X,Y,m,wd,ht);
-								
-								var stagePoint:Point = new Point(x,y);					
-								var displayObjArray:Array = STAGE.getObjectsUnderPoint(stagePoint);
+						if(numBlobs>1) byteArray.readBytes(aliveBlobs,0,setMsgByteLen);
+					}else if(type === "set"){
+						var id:int = byteArray.readInt(),
+							x:Number = byteArray.readFloat()*STAGE.stageWidth,
+							y:Number = byteArray.readFloat()*STAGE.stageHeight,
+							X:Number = byteArray.readFloat(),
+							Y:Number = byteArray.readFloat(),
+							m:Number = byteArray.readFloat(),
+							wd:Number = byteArray.readFloat(),
+							ht:Number = byteArray.readFloat(),							
+							stagePoint:Point = new Point(x,y),
+							displayObjArray:Array = STAGE.getObjectsUnderPoint(stagePoint),
+							dobj:DisplayObject = null,
+							tuioobj:TUIOObject = getObjectById(id);
 											
-								var dobj:DisplayObject = null;
-												
-								if(displayObjArray.length > 0){
-									dobj = displayObjArray[displayObjArray.length-1];	
-								}
-																									
-								var tuioobj:TUIOObject = getObjectById(id);
-								if(tuioobj == null){
-									tuioobj = new TUIOObject("2Dcur", id, x, y, X, Y, -1, 0, wd, ht, dobj);
-									STAGE.addChild(tuioobj.TUIO_CURSOR);								
-									OBJECT_ARRAY.push(tuioobj);
-									tuioobj.notifyCreated();
-								}else{
-									tuioobj.TUIO_CURSOR.x = x;
-									tuioobj.TUIO_CURSOR.y = y;
-									tuioobj.oldX = tuioobj.x;
-									tuioobj.oldY = tuioobj.y;
-									tuioobj.x = x;
-									tuioobj.y = y;
-									tuioobj.width = wd;
-									tuioobj.height = ht;
-									tuioobj.area = wd * ht;								
-									tuioobj.dX = X;
-									tuioobj.dY = Y;
-									tuioobj.setObjOver(dobj);
-									
-									var d:Date = new Date();																
-									if(!( int(Y*1000) == 0 && int(Y*1000) == 0)){
-										tuioobj.notifyMoved();
+						if(displayObjArray.length > 0){
+							dobj = displayObjArray[displayObjArray.length-1];	
+						}
+																							
+						if(tuioobj == null){
+							tuioobj = new TUIOObject("2Dcur", id, x, y, X, Y, -1, 0, wd, ht, dobj);
+							STAGE.addChild(tuioobj.TUIO_CURSOR);								
+							OBJECT_ARRAY.push(tuioobj);
+							tuioobj.notifyCreated();
+						}else{
+							tuioobj.TUIO_CURSOR.x = x;
+							tuioobj.TUIO_CURSOR.y = y;
+							tuioobj.oldX = tuioobj.x;
+							tuioobj.oldY = tuioobj.y;
+							tuioobj.x = x;
+							tuioobj.y = y;
+							tuioobj.width = wd;
+							tuioobj.height = ht;
+							tuioobj.area = wd * ht;								
+							tuioobj.dX = X;
+							tuioobj.dY = Y;
+							tuioobj.setObjOver(dobj);
+							
+							var d:Date = new Date();																
+							
+							if(!( int(X*1000) == 0 && int(Y*1000) == 0)){
+								tuioobj.notifyMoved();
+							}
+							
+							if( int(X*250) == 0 && int(Y*250) == 0) {
+								var lastModDur:Number = d.time - tuioobj.lastModifiedTime;
+								if(lastModDur < 0 ? -lastModDur : lastModDur > HOLD_THRESHOLD){
+									var eventArrayLen:int = EVENT_ARRAY.length;
+									for(var ndx:int=0; ndx<eventArrayLen; ndx++){
+										EVENT_ARRAY[ndx].dispatchEvent(tuioobj.getTouchEvent(TouchEvent.LONG_PRESS));
 									}
-									
-									if( int(Y*250) == 0 && int(Y*250) == 0) {
-										var lastModDur:Number = d.time - tuioobj.lastModifiedTime;
-										if(Math.abs(lastModDur) > HOLD_THRESHOLD){
-											for(var ndx:int=0; ndx<EVENT_ARRAY.length; ndx++){
-												EVENT_ARRAY[ndx].dispatchEvent(tuioobj.getTouchEvent(TouchEvent.LONG_PRESS));
-											}
-											tuioobj.lastModifiedTime = d.time;																		
-										}
-									}
+									tuioobj.lastModifiedTime = d.time;																		
 								}
+									
 							}
 						}
 						try{
@@ -231,22 +207,30 @@ package flash.events {
 						} catch (e:Error){
 							trace("(" + e + ") Dispatch event failed " + tuioobj.ID);
 						}
-					}else if(byteArrayBeginsWithString(byteArray,"fseq")){
-						
-						byteArray.position+=4;
-						
+
+						//trace("[SET]",id,x,y,X,Y,m,wd,ht);
+					}else if(type === "fseq"){
 						FRAME_COUNT = byteArray.readInt();
 						//trace("[FSEQ]",FRAME_COUNT);
 					}
+				}else if(path === "/tuio/2Dobj"){
+					if(type === "alive"){				
+						var numObjs:int = byteArray.readInt(),
+						    aliveMsgByteLen = (numObjs-1) << 2;
+						
+						byteArray.position += aliveMsgByteLen;
+					}else if(type === "set"){
+						//account for set
+					}else if(type === "fseq"){
+						//do fseq events exist in 2DObj profiles?
+					}
 				}else{
-					if(byteArray.bytesAvailable>0) byteArray.position++;
+					if(byteArray.bytesAvailable>0) byteArray.position++; //keep adding bytes one by one if no message type found
 				}
 			}
 			
 			if(aliveMessage){
-				update = true;
-				
-				if(DEBUG){
+				if(DEBUG && DEBUGGER.on){
 					DEBUGGER.clearDebugText();
 				}
 				
@@ -260,66 +244,56 @@ package flash.events {
 				
 				while(aliveBlobs.bytesAvailable>0){
 					curID = aliveBlobs.readInt();
-					if(DEBUG){
-						var activeBlobInfo:TUIOObject = getObjectById(curID);
-						if(activeBlobInfo!=null) DEBUGGER.addDebugText("blob "+curID+" ("+int(activeBlobInfo.x)+", "+int(activeBlobInfo.y)+")\n");
-					}
+					var curBlobObject = getObjectById(curID);
+					if(DEBUG && DEBUGGER.on && curBlobObject!=null) DEBUGGER.addDebugText("Blob #"+curID+" ("+int(curBlobObject.x)+", "+int(curBlobObject.y)+")\n");
 					if(getObjectById(curID)){
 						getObjectById(curID).TUIO_ALIVE = true;
 					}
 				}
 				
+				var aliveObjLen:int = OBJECT_ARRAY.length;
 				
-				for (var i:int=0; i<OBJECT_ARRAY.length; i++ ){	
+				for(var i:int=0; i<aliveObjLen; i++){
 					if(OBJECT_ARRAY[i].TUIO_ALIVE == false){
 						OBJECT_ARRAY[i].notifyRemoved();
 						STAGE.removeChild(OBJECT_ARRAY[i].TUIO_CURSOR);
 						OBJECT_ARRAY.splice(i, 1);
 						i--;
+						aliveObjLen = OBJECT_ARRAY.length;
 					}
 				}
-				
 				aliveMessage = false;
 			}
-
-			var finalTime = getTimer();
-			if(DEBUG && update){
-				DEBUGGER.addDebugText("\nTime test - " + (finalTime - time) + " ms");
-				update = false;
-			}
-			
-			byteArray = null;
+						
+			byteArray = null;			
 		}
 //---------------------------------------------------------------------------------------------------------------------------------------------
         private static function activateDebugMode():void{
-  				DEBUGGER = new TUIODebugger();
-				STAGE.addChild(DEBUGGER);
-				DEBUGGER.addEventListener(MouseEvent.CLICK, toggleDebug);		
-				DEBUGGER.addEventListener(TouchEvent.CLICK, toggleDebug);	
-				DEBUGGER.x=10
-				DEBUGGER.y=10;
-				DEBUGGER.on();
+  			DEBUGGER = new TUIODebugger();
+			STAGE.addChild(DEBUGGER);
+			DEBUGGER.x = 10
+			DEBUGGER.y = 10;
+			DEBUGGER.on = true;
 		}
 //---------------------------------------------------------------------------------------------------------------------------------------------
 		private static function socketStatus(e:Event):void{ 		
-				SOCKET_STATUS = SOCKET.connected;
-		}
-//---------------------------------------------------------------------------------------------------------------------------------------------
-		private static function toggleDebug(e:Event):void{ 			
-			if(!DEBUG){
-				DEBUG=true;	
-				DEBUGGER.on();
-			}else{
-				DEBUG=false;
-				DEBUGGER.off();
-			}	
+			SOCKET_STATUS = SOCKET.connected;
 		}
 //---------------------------------------------------------------------------------------------------------------------------------------------
         private static function dataHandler(e:ProgressEvent):void{    
-			var dump:ByteArray = new ByteArray();
+			var dump:ByteArray = new ByteArray(),
+			    startTime:int = getTimer();
+			
 			SOCKET.readBytes(dump);
 			
 			processMessage(dump);
+			
+			var finishTime:int = getTimer();
+			
+			if(DEBUG && DEBUGGER.on){
+				DEBUGGER.clearFooterText();
+				DEBUGGER.addFooterText("Time test - " + (finishTime - startTime) + " ms");
+			}
 			
 			dump = null;
         } 
@@ -338,17 +312,16 @@ package flash.events {
 			startSocket();
         }
 //---------------------------------------------------------------------------------------------------------------------------------------------
-		private static function byteArrayBeginsWithString(byteArray:ByteArray,searchString:String):Boolean{
-			var strLen:Number = searchString.length;
-			if(strLen>byteArray.bytesAvailable) return false;
-			var checkByteString:String = byteArray.readUTFBytes(strLen)			
-			if(checkByteString==searchString){
+		/*private static function byteArrayBeginsWithString(byteArray:ByteArray,searchString:String,byteLength:Number = -1):Boolean{ //speed increase when bytelength supplied??
+			if(byteLength<0) byteLength = searchString.length;
+			if(byteLength>byteArray.bytesAvailable) return false;
+			if(byteArray.readUTFBytes(byteLength)===searchString){
 				return true;
 			}else{
-				byteArray.position -= strLen;
+				byteArray.position -= byteLength;
 				return false;
 			}
-		}
+		}*/
 
 	}
 }
