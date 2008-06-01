@@ -70,9 +70,12 @@ void initcp();
 
 #define HELP_ABOUT "\
 ToXy - Tuio sOcket proXy v 1.0\n\
-by Goran Medakovic @jet-plane\n\
+written by Goran Medakovic @jet-plane\n\
+credits:\n\
+Ben Lau - linux gtk part\n\
+Weyforth - flash  as3 implementation\n\
 \n\
-This software is registered under GPL V2.\n\
+This software is licensed under GPL V2.\n\
 "
 #define THIS_CLASSNAME      "ToXy tuio socket proxy Window"
 #define THIS_TITLE          "ToXy Tuio sOcket proXy tray"
