@@ -37,6 +37,10 @@
 #include <shlwapi.h> //4 PathFileExistsA
 #define QLEN 5
 #define SHUT_RDWR SD_BOTH
+  #define TA_FAILED 0
+   #define TA_SUCCESS_CLEAN 1
+   #define TA_SUCCESS_KILL 2
+   #define TA_SUCCESS_16 3
 
 struct protoent *ptrp;
 struct sockaddr_in address;
@@ -313,8 +317,13 @@ INT_PTR CALLBACK About( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam )
     switch (uMessage)
     {
     case WM_INITDIALOG:
+        {
+        HWND control;
+        control = GetDlgItem(hWnd, IDD_APIC);
+        HBITMAP bitmap = (HBITMAP)LoadImage(GetModuleHandle(NULL),MAKEINTRESOURCE(100), IMAGE_ICON,0,0,0);
+        SendMessage(control, STM_SETIMAGE,  (WPARAM)IMAGE_ICON, (LPARAM)bitmap);
         return TRUE;
-
+        }
     case WM_COMMAND:
         switch (wParam)
         {
@@ -337,6 +346,7 @@ INT_PTR CALLBACK Configure( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lPar
     switch (uMessage)
     {
     case WM_INITDIALOG:
+        {
         //hWndlg = hWnd;
         HWND control;
 
@@ -355,11 +365,13 @@ INT_PTR CALLBACK Configure( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lPar
             PostMessage(control, BM_SETCHECK,BST_CHECKED,0);
         }
         return TRUE;
-
+        }
     case WM_COMMAND:
         switch (wParam)
         {
         case 1:
+            {
+            HWND control;
             control = GetDlgItem(hWnd, IDD_PORT);
             char tmp[6] = {0};
             GetWindowText(control, (LPWSTR)port, sizeof(port));
@@ -373,7 +385,7 @@ INT_PTR CALLBACK Configure( HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lPar
             EndDialog(hWnd, COK);
             //hWndlg = NULL;
             return TRUE;
-
+        }
         case 2:
             EndDialog(hWnd, CCAN);
             return TRUE;
@@ -497,210 +509,6 @@ void SavePrefsEx()
     sprintf(buff, "%d", debug);
     WritePrivateProfileString("misc", "debug",    buff,  ConfigFile);
 }
-/* Adds double quotes around 'src' and concatenates the resulting
- * string to 'dest', returns a pointer to 'dest'
- */
-static void *strqcat(char *dest, const char *src)
-{
-    strcat(dest, "\"");
-    strcat(dest, src);
-    strcat(dest, "\"");
-
-    return dest;
-}
-
-/* Copies the string 'src' to 'dest' enclosing it with
- * double quotes (") and returns a pointer to 'dest'
- */
-static void *strqcpy(char *dest, const char *src)
-{
-    strcpy(dest, "\"");
-    strcat(dest, src);
-    strcat(dest, "\"");
-
-    return dest;
-}
-char *build_command(char **argv, int quote)
-{
-    char *cmd;
-    int i, length = 0;
-
-    for (i = 0; argv[i]; i++)
-    {
-        if (quote == 1)
-            length += 3; /* two quotation marks and a space */
-        else
-            length++;
-
-        length += (int)strlen(argv[i]);
-    }
-
-    cmd = (char *)malloc(length);
-
-    if (quote == 1)
-        strqcpy(cmd, argv[0]);
-    else
-        strcpy(cmd, argv[0]);
-
-    for (i = 1; argv[i]; i++)
-    {
-        strcat(cmd, " ");
-
-        if (quote == 1)
-        {
-            strqcat(cmd, argv[i]);
-        }
-        else
-            strcat(cmd, argv[i]);
-    }
-
-    return cmd;
-}
-/* Check if the operating system is Windows NT/2000 or newer */
-int checknt()
-{
-    OSVERSIONINFO osv;
-    osv.dwOSVersionInfoSize = sizeof(osv);
-
-    GetVersionEx(&osv);
-
-    if (osv.dwPlatformId == VER_PLATFORM_WIN32_NT)
-        return TRUE;
-    else
-        return FALSE;
-}
-/* Perror for Windows - shows last Windows error message */
-void winerror(const char *message)
-{
-    LPVOID msgbuf;
-    int error;
-
-    error = GetLastError();
-
-    FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-        NULL,
-        error,
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPTSTR) &msgbuf,
-        0,
-        NULL
-    );
-
-    fprintf(stderr, "%s: %s\n", message, (char *)msgbuf);
-
-    LocalFree(msgbuf);
-}
-/* Spawns a new process with argument list 'argv'
- * and redirects its standard output to 'stream'
- *
- * Returns a handle of the newly created process
- * or -1 if an error occurs
- */
-
-int SpawnPipe(char *argv[], void **stream)
-{
-    STARTUPINFO si;
-    SECURITY_ATTRIBUTES sa;
-    SECURITY_DESCRIPTOR sd;
-    PROCESS_INFORMATION pi;
-    HANDLE read_pipe, write_pipe;
-
-    int fd, create;
-    char *command = 0;
-
-    command = build_command(argv, 1);
-
-    if (!command)
-        return -1;
-
-    /* Set the length of the security attribute structure and allow
-       the handle to be inherited by child processes */
-
-    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa.bInheritHandle = TRUE;
-
-    /* Use security descriptor for the new pipe on Windows NT-based systems */
-
-    if (checknt())
-    {
-        InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
-        SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE);
-        sa.lpSecurityDescriptor = &sd;
-    }
-    /* Pipe will use ACLs from default descriptor */
-    else
-        sa.lpSecurityDescriptor = NULL;
-
-    /* Create a new pipe with system's default buffer size */
-    if (!CreatePipe(&read_pipe, &write_pipe, &sa, 0))
-    {
-        winerror("CreatePipe");
-
-        CloseHandle(read_pipe);
-        CloseHandle(write_pipe);
-
-        return -1;
-    }
-
-    GetStartupInfo(&si);
-
-    /* Sets the standard output handle for the process to the
-       handle specified in hStdOutput */
-    si.dwFlags = STARTF_USESTDHANDLES;
-
-    si.hStdOutput = write_pipe;
-    si.hStdError  = (HANDLE) _get_osfhandle (2);
-
-    create = CreateProcess(
-                 NULL,    // The full path of app to launch
-                 command,     // Command line parameters
-                 NULL,     // Default process security attributes
-                 NULL,     // Default thread security attributes
-                 TRUE,     // Inherit handles from the parent
-                 0,      // Normal priority
-                 NULL,     // Use the same environment as the parent
-                 NULL,     // Use app's directory as current
-                 &si,     // Startup Information
-                 &pi);     // Process information stored upon return
-
-    if (!create)
-    {
-        winerror("CreateProcess");
-
-        CloseHandle(read_pipe);
-        CloseHandle(write_pipe);
-
-        return -1;
-    }
-
-    /* Associates a file descriptor with the stdout pipe */
-    fd = _open_osfhandle((intptr_t)read_pipe, _O_BINARY);
-
-    /* Close the handle that we're not going to use */
-    CloseHandle(write_pipe);
-
-    if (!fd)
-    {
-        perror("_open_osfhandle");
-        return -1;
-    }
-
-    /* Open the pipe stream using its file descriptor */
-    *stream = fdopen(fd, "r");
-
-    if (!(*stream))
-    {
-        perror("fdopen");
-        close(fd);
-        return -1;
-    }
-
-    if (command)
-        free(command);
-
-    return (int)pi.hProcess;
-}
 
 static void
 set_errno(int winsock_err)
@@ -772,34 +580,76 @@ void initlo()
     lo_server_add_method(st, NULL, NULL, fwd_handler, NULL);
 }
 
+BOOL CALLBACK TerminateAppEnum( HWND hwnd, LPARAM lParam )
+{
+  DWORD dwID ;
+
+  GetWindowThreadProcessId(hwnd, &dwID) ;
+
+  if(dwID == (DWORD)lParam)
+  {
+     PostMessage(hwnd, WM_CLOSE, 0, 0) ;
+  }
+
+  return TRUE ;
+}
+
+DWORD WINAPI TerminateApp( DWORD dwPID, DWORD dwTimeout )
+{
+  HANDLE   hProc ;
+  DWORD   dwRet ;
+
+  // If we can't open the process with PROCESS_TERMINATE rights,
+  // then we give up immediately.
+  hProc = OpenProcess(SYNCHRONIZE|PROCESS_TERMINATE, FALSE,
+     dwPID);
+
+  if(hProc == NULL)
+  {
+     return TA_FAILED ;
+  }
+
+  // TerminateAppEnum() posts WM_CLOSE to all windows whose PID
+  // matches your process's.
+  EnumWindows((WNDENUMPROC)TerminateAppEnum, (LPARAM) dwPID) ;
+
+  // Wait on the handle. If it signals, great. If it times out,
+  // then you kill it.
+  if(WaitForSingleObject(hProc, dwTimeout)!=WAIT_OBJECT_0)
+     dwRet=(TerminateProcess(hProc,0)?TA_SUCCESS_KILL:TA_FAILED);
+  else
+     dwRet = TA_SUCCESS_CLEAN ;
+
+  CloseHandle(hProc) ;
+
+  return dwRet ;
+}
+
 int main(int argc, char *argv[])
 {
     void *status;
     LoadPrefsEx();
-    int pid = -1;
-    FILE *file = 0;
-    if (PathFileExistsA (osc))
-    {
-        char *arg[1], c = 0;
-        arg[0]= osc;
-        arg[1]=NULL;
-        pid = SpawnPipe(arg, (void **)&file);
-    }
-//if (pid && file)
-    //{
-    //printf("Process name: '%s', PID: %d\n", argv[0], pid);
-    //printf("Process output:\n");
-
-    //* Add output processing here */
-    //while (c != EOF)
-    //{
-    //c = (char)getc(file);
-    //putchar(c);
-    //}
-
-    //* Close the pipe once it's not needed anymore */
-    //fclose(file);
-    //}
+    int pid = NULL;
+    STARTUPINFO StartupInfo;
+    PROCESS_INFORMATION ProcessInfo;
+    if (PathFileExistsA (osc) && aosc)
+{
+    memset(&StartupInfo, 0, sizeof(StartupInfo));
+	StartupInfo.cb = sizeof(STARTUPINFO);
+	StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
+	StartupInfo.wShowWindow = SW_HIDE;
+	
+    if (!CreateProcess( NULL, osc, NULL, NULL, FALSE,
+		DETACHED_PROCESS, //CREATE_NEW_CONSOLE creates new console DETACHED_PROCESS does not automatically create a new console
+		NULL, 
+		NULL,
+		&StartupInfo,
+		&ProcessInfo))
+	{
+		return GetLastError();		
+	}
+	pid = ProcessInfo.hProcess;
+}
     int lo_fd;
     int retval;
     fd_set rfds;
@@ -838,7 +688,17 @@ int main(int argc, char *argv[])
         while (!done);
     }
     SavePrefsEx();
-    if (pid && file) fclose(file);
+    //if (pid && file) fclose(file);
+    if (pid)
+    {
+    SendMessage(ProcessInfo.hProcess, WM_DESTROY, 0, 0);// WM_CLOSE / WM_DESTROY
+    SendMessage(ProcessInfo.hProcess, WM_CLOSE, 0, 0);// WM_CLOSE / WM_DESTROY
+    //printf("th: %d, pid %d\n",ProcessInfo.hThread,ProcessInfo.hProcess);
+    TerminateApp(ProcessInfo.hProcess, 100000);
+    TerminateProcess(ProcessInfo.hProcess, 0);
+    CloseHandle(ProcessInfo.hThread);
+	CloseHandle(ProcessInfo.hProcess);
+    }
     closesocket(clientsock);
     closesocket(servsock);
     exit (0);

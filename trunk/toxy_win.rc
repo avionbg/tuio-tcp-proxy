@@ -31,11 +31,11 @@ FONT 8, "Ms Shell Dlg"
 BEGIN
   CONTROL "OK",1,"BUTTON",BS_DEFPUSHBUTTON |BS_VCENTER |BS_CENTER |WS_CHILD |WS_TABSTOP |WS_VISIBLE ,70,74,50,14
   CONTROL "Ben Lau - linux gtk part",2,"STATIC",SS_LEFT |WS_CHILD |WS_GROUP |WS_VISIBLE ,48,34,93,8
-  CONTROL "T o X y - Tuio sOcket proXy v 1.1",65535,"STATIC",SS_SUNKEN |SS_CENTER |WS_CHILD |WS_VISIBLE ,34,4,114,10
+  CONTROL "T o X y - Tuio sOcket proXy v 1.2",65535,"STATIC",SS_CENTER |WS_CHILD |WS_VISIBLE ,34,4,114,10
   CONTROL "Weyforth - flash  as3 classes",3,"STATIC",SS_LEFT |WS_CHILD |WS_GROUP |WS_VISIBLE ,48,44,108,8
   CONTROL "Writen by Goran Medakovic - jet-plane",4,"STATIC",SS_LEFT |WS_CHILD |WS_GROUP |WS_VISIBLE ,48,22,131,8
   CONTROL "This software is licensed under GPL V2.",5,"STATIC",SS_LEFT |WS_CHILD |WS_GROUP |WS_VISIBLE ,48,60,120,8
-  CONTROL "Picture0",0,"STATIC",SS_ICON |WS_CHILD |WS_VISIBLE ,4,26,39,35
+  CONTROL "Picture0",0,"STATIC",SS_CENTERIMAGE | SS_REALSIZEIMAGE |SS_ICON |WS_CHILD |WS_VISIBLE ,4,26,39,35
 END
 
 1002 DIALOG 66, 40, 205, 148
@@ -68,12 +68,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Microlink doo"
       VALUE "FileDescription", "Tuio sOcket proXY"
-      VALUE "FileVersion", "1.0"
+      VALUE "FileVersion", "1.2"
       VALUE "InternalName", "toxy"
       VALUE "LegalCopyright", "GNU Public License v.2"
       VALUE "OriginalFilename", "toxy.c"
       VALUE "ProductName", "toxy"
-      VALUE "ProductVersion", "1.0"
+      VALUE "ProductVersion", "1.2"
     END
   END
   BLOCK "VarFileInfo"
