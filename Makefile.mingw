@@ -6,8 +6,8 @@ STRIP=i686-mingw32-strip
 .PHONY: all
 all: tuio_tcp_proxy.exe tuio_dump.exe toxy.exe toxy_dump.exe
 
-toxy.exe: toxy.c
-	$(CC) $< -o $@ $(CFLAGS) $(LIBS) $(INCLUDES)
+toxy.exe: toxy.o libtoxy.o
+	$(CC) $< -o $^ $(CFLAGS) $(LIBS) $(INCLUDES)
 	$(STRIP) $@
 
 tuio_tcp_proxy.exe: tuio_tcp_proxy.c
@@ -21,6 +21,9 @@ tuio_dump.exe: tuio_dump.c
 toxy_dump.exe: toxy_dump.c
 	$(CC) $< -o $@ $(CFLAGS) $(INCLUDES) $(LIBS)
 	$(STRIP) $@
+
+%.o : %.c
+	$(CC) $(CFLAGS) -c $< 
 
 .PHONY clean:
 	rm -f tuio_dump.exe toxy_dump.exe toxy.exe tuio_tcp_proxy.exe 
