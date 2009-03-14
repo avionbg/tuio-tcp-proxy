@@ -18,5 +18,5 @@ app from tray icon.
 Benefit of this is that toxy eats the dos-console window so your
 screen will be free of unwanted windows.
 
-More about *TUIO*, _specs_ _and_ _details_ about it you can find on official page 
+More about *TUIO*, _specs_ _,_ _details_ _and_ _software_, you can find on official page 
 [http://www.tuio.org]
