@@ -1,4 +1,4 @@
-#TOXY - TuiO tcp proXY
+TOXY - TuiO tcp proXY
 
 = Introduction =
 
