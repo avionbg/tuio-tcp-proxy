@@ -2,7 +2,7 @@ TOXY - TuiO tcp proXY
 
 = Introduction =
 
-Toxy (TuiO proXY) is a simple server impletation based on liblo.
+Toxy (TuiO proXY) is a simple server implementation based on liblo.
 In simple words it forwards all messages from tcp to udp, as flash
 is not capable of udp communication this is a helper app that adds that
 possibility.
@@ -17,3 +17,6 @@ provider app (OSC.exe or anything else) in the config dialog, and afterwards sta
 app from tray icon.
 Benefit of this is that toxy eats the dos-console window so your
 screen will be free of unwanted windows.
+
+More about *TUIO*, _specs_ _and_ _details_ about it you can find on official page 
+[http://www.tuio.org]
