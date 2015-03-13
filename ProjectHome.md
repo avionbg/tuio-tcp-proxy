@@ -1,0 +1,1 @@
+tuio tcp proxy is server thats forwarding tuio messages from udp based adress to tcp specified port.
